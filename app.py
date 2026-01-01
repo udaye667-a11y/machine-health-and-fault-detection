@@ -113,5 +113,3 @@ else:
 # ------------------ FOOTER ------------------ #
 st.write("---")
 st.caption("© Machine Health & Fault Detection System - Powered by Streamlit")
-
-
