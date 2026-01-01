@@ -97,7 +97,7 @@ st.subheader("📌 Model Confusion Matrix (Evaluation Results)")
 
 if "cm.npy" in os.listdir() and "labels.npy" in os.listdir():
     cm = np.load("cm.npy")
- labels = np.load("labels.npy", allow_pickle=True)
+    labels = np.load("labels.npy", allow_pickle=True)
     fig3, ax3 = plt.subplots()
     sns.heatmap(cm, annot=True, fmt="d", cmap="Greens",
                 xticklabels=labels,
@@ -113,4 +113,5 @@ else:
 # ------------------ FOOTER ------------------ #
 st.write("---")
 st.caption("© Machine Health & Fault Detection System - Powered by Streamlit")
+
 
