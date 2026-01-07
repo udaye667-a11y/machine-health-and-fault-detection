@@ -6,167 +6,185 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-# ------------------ PAGE CONFIG ------------------ #
+# --------------------------------------------------
+# PAGE CONFIG
+# --------------------------------------------------
 st.set_page_config(
-    page_title="AI-Driven Predictive Maintenance System",
-    layout="wide",
-    page_icon="🛠"
+    page_title="AI Predictive Maintenance System",
+    layout="wide"
 )
 
-# Dark Theme Branding Header
-st.markdown("""
-<style>
-.header-container {
-    background-color: #0A0A0A;
-    padding: 20px;
-    border-radius: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.title-text {
-    color: #00C3FF;
-    font-size: 26px;
-    font-weight: bold;
-}
-.subtitle-text {
-    color: #BBBBBB;
-    font-size: 16px;
-}
-.details-text {
-    color: #FFFFFF;
-    font-size: 14px;
-    line-height: 1.3;
-}
-</style>
-""", unsafe_allow_html=True)
+# --------------------------------------------------
+# HEADER WITH COLLEGE LOGO (STREAMLIT-NATIVE)
+# --------------------------------------------------
+logo_url = "https://raw.githubusercontent.com/udaye667-a11y/machine-health-and-fault-detection/main/dsatm_logo.jpg"
 
-# College Logo (GitHub raw link version - update after uploading logo file)
-logo_url = "https://raw.githubusercontent.com/udaye667-a11y/machine-health-and-fault-detection/main/dsatm_logo.png"
+col1, col2 = st.columns([6, 1])
 
-st.markdown(f"""
-<div class="header-container">
-    <div>
-        <div class="title-text">AI-Driven Predictive Maintenance & Condition Monitoring System</div>
-        <div class="subtitle-text">For Rotating Machinery Using Machine Learning & Vibration Analysis</div><br>
-        <div class="details-text">
-            <b>Student:</b> Uday Eshwar<br>
-            <b>USN:</b> 1DT23ME017<br>
-            <b>Department:</b> Mechanical Engineering<br>
-            <b>Institution:</b> Dayananda Sagar Academy of Technology & Management, Bengaluru<br>
-            <b>Academic Year:</b> 2024 – 2025
-        </div>
+with col1:
+    st.markdown("""
+    <div style="background-color:#0A0A0A;padding:25px;border-radius:14px;">
+        <h1 style="color:#00C3FF;margin-bottom:10px;">
+            AI-Driven Predictive Maintenance and Condition Monitoring System
+        </h1>
+        <p style="color:#E8E8E8;font-size:16px;margin:0;">
+            <b>Uday Eshwar</b> | USN: 1DT23ME017<br>
+            Department of Mechanical Engineering<br>
+            Dayananda Sagar Academy of Technology & Management
+        </p>
     </div>
-    <div>
-        <img src="{logo_url}" width="120">
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
+with col2:
+    st.image(logo_url, width=130)
 
 st.write("")
 
+# --------------------------------------------------
+# LOAD TRAINED MODEL
+# --------------------------------------------------
+bundle = joblib.load("model.pkl")
+model = bundle["model"]
+features = bundle["features"]
+scaler = bundle["scaler"]
 
-# Load model
-model, feature_columns = joblib.load("model.pkl")
+model_used = False
 
-# ------------------ Sample Download ------------------ #
-st.subheader("📥 Download Sample Data")
-col1, col2 = st.columns(2)
+# --------------------------------------------------
+# FILE UPLOAD
+# --------------------------------------------------
+st.subheader("📂 Upload Data Files")
+csv_file = st.file_uploader("Upload Feature CSV", type=["csv"])
+npz_file = st.file_uploader("Upload Vibration Signal (.npz)", type=["npz"])
 
-if os.path.exists("feature_time_48k_2048_load_1.csv"):
-    with open("feature_time_48k_2048_load_1.csv", "rb") as f:
-        col1.download_button("⬇️ Sample Feature CSV", f, "sample_features.csv")
+# --------------------------------------------------
+# PREDICTION & ANALYSIS
+# --------------------------------------------------
+if csv_file is not None:
+    model_used = True
 
-if os.path.exists("CWRU_sample_signal.npz"):
-    with open("CWRU_sample_signal.npz", "rb") as f:
-        col2.download_button("⬇️ Sample Vibration Signal", f, "sample_signal.npz")
+    df = pd.read_csv(csv_file)
+    X = scaler.transform(df[features])
 
+    preds = model.predict(X)
+    probs = model.predict_proba(X)
+    confidence = np.max(probs, axis=1) * 100
 
-# File Upload
-uploaded_feat = st.file_uploader("📌 Upload Your Feature CSV", type=["csv"])
-uploaded_npz = st.file_uploader("📌 Upload Your Raw Vibration (.npz)", type=["npz"])
-
-
-# ------------------ Prediction Section ------------------ #
-if uploaded_feat is not None:
-    st.subheader("🧠 Fault Classification Results")
-
-    df = pd.read_csv(uploaded_feat)
-    df = df[feature_columns]
-
-    preds = model.predict(df)
-    df_pred = pd.DataFrame(preds, columns=["Predicted Condition"])
-    st.dataframe(df_pred)
-
-    # Confidence
-    probs = model.predict_proba(df)
-    conf_scores = np.max(probs, axis=1) * 100
-
-    df_conf = pd.DataFrame({
+    results = pd.DataFrame({
         "Predicted Condition": preds,
-        "Confidence (%)": conf_scores.round(2)
+        "Confidence (%)": confidence.round(2)
     })
-    st.write(df_conf)
 
-    # Health Score
-    total = len(df_conf)
-    normal_count = sum(df_conf["Predicted Condition"] == "Normal")
-    health_score = (normal_count / total) * 100
+    st.subheader("🔍 Fault Classification Results")
+    st.dataframe(results, use_container_width=True)
 
-    st.metric("Machine Health Score", f"{health_score:.2f}%")
+    # ---------------- PIE CHART ----------------
+    st.subheader("📊 Fault Distribution")
+    counts = results["Predicted Condition"].value_counts()
 
-    st.success("Prediction Completed Successfully! 🚀")
+    fig_pie, ax_pie = plt.subplots()
+    ax_pie.pie(
+        counts,
+        labels=counts.index,
+        autopct="%1.1f%%",
+        startangle=90
+    )
+    ax_pie.axis("equal")
+    st.pyplot(fig_pie)
 
+    # ---------------- HEALTH & SEVERITY ----------------
+    fault_percent = 100 - (counts.get("Normal", 0) / len(results) * 100)
+    health_score = 100 - fault_percent
 
-# ------------------ Signal Visualization ------------------ #
-if uploaded_npz is not None:
-    st.subheader("📈 Time Domain Vibration Signal")
+    if health_score >= 90:
+        severity, color = "🟢 Healthy", "green"
+    elif health_score >= 75:
+        severity, color = "🟡 Low Severity", "gold"
+    elif health_score >= 60:
+        severity, color = "🟠 Moderate Severity", "orange"
+    elif health_score >= 40:
+        severity, color = "🔴 High Severity", "red"
+    else:
+        severity, color = "🚨 CRITICAL", "darkred"
 
-    npz = np.load(uploaded_npz)
-    signal = npz["signal"]
-    if signal.ndim > 1: signal = signal.flatten()
+    st.subheader("🚦 Machine Health Status")
+    st.markdown(f"<h3 style='color:{color}'>{severity}</h3>", unsafe_allow_html=True)
+    st.progress(int(health_score))
 
-    fig1, ax1 = plt.subplots()
-    ax1.plot(signal[:3000])
-    st.pyplot(fig1)
+    st.download_button(
+        "⬇ Download Prediction Results",
+        results.to_csv(index=False),
+        "prediction_results.csv"
+    )
 
-    # FFT
-    st.subheader("📊 Frequency Spectrum with Fault Indicators")
+# --------------------------------------------------
+# FFT ANALYSIS
+# --------------------------------------------------
+if npz_file is not None:
+    st.subheader("📈 Vibration Signal Analysis")
+
+    signal = np.load(npz_file)["signal"].flatten()
+
+    fig, ax = plt.subplots()
+    ax.plot(signal[:3000])
+    ax.set_title("Time Domain Signal")
+    st.pyplot(fig)
+
+    st.subheader("📊 Frequency Spectrum (FFT) – 1500 RPM")
+
     fft = np.abs(np.fft.fft(signal))
-    freq = np.fft.fftfreq(len(signal), d=1/48000)
-    m = freq >= 0
-    freq, fft = freq[m], fft[m]
+    freq = np.fft.fftfreq(len(signal), 1 / 48000)
+    mask = freq >= 0
 
     fig2, ax2 = plt.subplots()
-    ax2.plot(freq[:5000], fft[:5000])
+    ax2.plot(freq[mask][:5000], fft[mask][:5000])
 
-    # Fault markers
-    shaft = 30
-    markers = {"BPFI": 5.4 * shaft, "BPFO": 3.6 * shaft, "FTF": 0.4 * shaft}
-    for name, val in markers.items():
-        ax2.axvline(val, color="red", linestyle="--")
-        ax2.text(val, max(fft[:5000])*0.7, name, rotation=90, color="red")
+    shaft_freq = 25  # 1500 RPM
+    fault_freqs = {
+        "BPFI": 5.4 * shaft_freq,
+        "BPFO": 3.6 * shaft_freq,
+        "FTF": 0.4 * shaft_freq
+    }
+
+    for label, f in fault_freqs.items():
+        ax2.axvline(f, color="red", linestyle="--")
+        ax2.text(f, max(fft[:5000]) * 0.7, label, rotation=90, color="red")
 
     st.pyplot(fig2)
 
-    st.success("Signal Analysis Completed 🎯")
+# --------------------------------------------------
+# MODEL EVALUATION (ONLY AFTER UPLOAD)
+# --------------------------------------------------
+if model_used:
 
+    if os.path.exists("feature_importance.npy"):
+        st.subheader("🧠 Feature Importance")
+        imp = np.load("feature_importance.npy")
 
-# ------------------ Confusion Matrix ------------------ #
-st.subheader("📌 Confusion Matrix")
+        fig3, ax3 = plt.subplots()
+        sns.barplot(x=imp, y=features, ax=ax3)
+        st.pyplot(fig3)
 
-if "cm.npy" in os.listdir() and "labels.npy" in os.listdir():
-    cm = np.load("cm.npy")
-    labels = np.load("labels.npy", allow_pickle=True)
+    if os.path.exists("confusion_matrix.npy"):
+        st.subheader("📌 Confusion Matrix")
+        cm = np.load("confusion_matrix.npy")
+        labels = np.load("labels.npy", allow_pickle=True)
 
-    fig3, ax3 = plt.subplots()
-    sns.heatmap(cm, annot=True, cmap="Blues",
-                xticklabels=labels, yticklabels=labels)
-    st.pyplot(fig3)
-else:
-    st.warning("Confusion Matrix not found ❗")
+        fig4, ax4 = plt.subplots()
+        sns.heatmap(
+            cm, annot=True, fmt="d",
+            xticklabels=labels,
+            yticklabels=labels,
+            cmap="Blues"
+        )
+        st.pyplot(fig4)
 
+    if os.path.exists("classification_report.txt"):
+        st.subheader("📄 Classification Report")
+        st.text(open("classification_report.txt").read())
 
-st.write("---")
-st.caption("© AI-Driven Predictive Maintenance System | Developed by: Uday Eshwar 🚀")
+# --------------------------------------------------
+# FOOTER
+# --------------------------------------------------
+st.markdown("---")
+st.caption("© 2024–25 | AI-Driven Predictive Maintenance System | Mechanical Engineering | DSATM")
